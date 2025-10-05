@@ -11,7 +11,9 @@ python -m venv .venv
 . .venv/Scripts/activate   # PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 set CAM_DEVICE=video=Camo
-# 或 set CAM_INDEX=0,即你的电脑虚拟摄像头索引或名称
+# 或 set CAM_INDEX=0,需要获取你的电脑虚拟摄像头索引或名称如果下载了ffmpeg可通过
+ffmpeg -hide_banner -f dshow -list_devices true -i dummy
+#查看你的虚拟相机名称
 python python WebSocket2Unity.py
 ```
 按 **c** 依次点击地图四角（TL,TR,BR,BL），脚本会生成/覆盖 `homography.json`。
