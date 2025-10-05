@@ -14,6 +14,8 @@
 # pip install opencv-contrib-python websockets numpy
 import asyncio, json, time, threading, queue
 import numpy as np, cv2, websockets, os, sys
+import ctypes
+from ctypes import wintypes
 
 # 环境变量与默认设备名（会自动尝试）
 CAM_DEVICE = os.environ.get("CAM_DEVICE", "").strip()
@@ -149,6 +151,7 @@ async def serve(ws):
     while True:
         f = frame_q.get()
         g = cv2.cvtColor(f, cv2.COLOR_BGR2GRAY)
+        print(det)
         if det is not None:
             corners, ids, _ = det.detectMarkers(g)
         else:
@@ -175,7 +178,8 @@ async def serve(ws):
         cv2.putText(f, info, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
         cv2.imshow("Cam", f)
         k = cv2.waitKey(1)&0xFF
-        if k==27: break
+        if k==27: 
+            os._exit(0)
         if k==ord('c'):
             Hm = calibrate(f)
             if Hm is not None:
@@ -211,13 +215,16 @@ def preview_loop():
                     W,Hh = dst_size
                     uv = [float(p[0]/W), float(p[1]/Hh)]
                 payload_markers.append({"id": int(cid), "px": [float(cx),float(cy)], "uv": uv})
+                print(f"x: {cx}, y: {cy}")
                 cv2.polylines(f, [pts.astype(int)], True, (0,255,0), 2)
                 cv2.putText(f, f"ID {cid}", (int(cx)+6,int(cy)-6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,255), 2)
         info = f"H:{'Y' if H is not None else 'N'}  Markers:{len(payload_markers)}  Map:{dst_size}"
         cv2.putText(f, info, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
         cv2.imshow("Cam", f)
+
         k = cv2.waitKey(1)&0xFF
-        if k==27: break
+        if k==27: 
+            os._exit(0)
         if k==ord('c'):
             Hm = calibrate(f)
             if Hm is not None:
