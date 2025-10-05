@@ -1,0 +1,65 @@
+## Project-specific ignores
+/记录.docx
+DroidCam/
+
+## OS files
+.DS_Store
+Thumbs.db
+
+## Editors/IDE
+.vscode/
+*.code-workspace
+
+## Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env*
+
+## Unity (general)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Mm]emoryCaptures/
+
+## Unity (project subfolder)
+unity_client/Library/
+unity_client/Temp/
+unity_client/Obj/
+unity_client/Build*/
+unity_client/Logs/
+unity_client/[Pp]ackages/*-lock.json
+
+## Visual Studio/Mono
+*.user
+*.userprefs
+*.suo
+*.sln.docstates
+
+## Binary and large artifacts
+*.dll
+*.exe
+*.pdb
+*.pak
+*.dat
+*.bin
+*.iso
+*.dmg
+*.msi
+*.zip
+*.7z
+*.rar
+
+## Logs
+*.log
+logs/
+
+## Misc
+node_modules/
+dist/
+coverage/
