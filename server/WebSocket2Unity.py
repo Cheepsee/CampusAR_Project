@@ -19,11 +19,19 @@ import numpy as np, cv2, websockets, os, sys
 CAM_DEVICE = os.environ.get("CAM_DEVICE", "").strip()
 CAM_INDEX  = os.environ.get("CAM_INDEX", "").strip()
 COMMON_NAMES = [
+    # iVCam variants (try these first)
+    "video=e2eSoft iVCam",
+    "video=iVCam",
+    "video=e2eSoft iVCam #2",
+    # Other common virtual cameras
     "video=Camo",
     "video=Camo Studio Virtual Camera",
-    "video=e2eSoft iVCam",
     "video=EpocCam Camera",
     "video=OBS Virtual Camera",
+    # DroidCam variants (least preferred)
+    "video=DroidCam Source",
+    "video=DroidCam Source 2",
+    "video=DroidCam Source 3",
 ]
 
 ARUCO_DICT = cv2.aruco.DICT_4X4_50
@@ -36,6 +44,7 @@ cap = None
 frame_q = queue.Queue(maxsize=2)
 H = None
 dst_size = None  # (W,H)
+SRC_NAME = None  # record which source opened
 
 def load_map_cfg():
     """读取地图配置，得到目标面的宽高（用于 uv 归一化）。"""
@@ -67,38 +76,42 @@ def load_h():
 
 def open_capture():
     """尽力按名称/索引 + 多后端打开虚拟摄像头。"""
-    global cap
+    global cap, SRC_NAME
     backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF]
     if CAM_DEVICE:
         for be in backends:
             print(f"[INFO] Try {CAM_DEVICE} backend={be}")
             c = cv2.VideoCapture(CAM_DEVICE, be)
-            if c.isOpened(): cap = c; return True
+            if c.isOpened():
+                cap = c; SRC_NAME = CAM_DEVICE; return True
     if CAM_INDEX:
         try:
             idx = int(CAM_INDEX)
             for be in backends:
                 print(f"[INFO] Try index {idx} backend={be}")
                 c = cv2.VideoCapture(idx, be)
-                if c.isOpened(): cap = c; return True
+                if c.isOpened():
+                    cap = c; SRC_NAME = f"index:{idx}"; return True
         except: pass
     for name in COMMON_NAMES:
         for be in backends:
             print(f"[INFO] Try {name} backend={be}")
             c = cv2.VideoCapture(name, be)
-            if c.isOpened(): cap = c; return True
+            if c.isOpened():
+                cap = c; SRC_NAME = name; return True
     for idx in range(0,5):
         for be in backends:
             print(f"[INFO] Try index {idx} backend={be}")
             c = cv2.VideoCapture(idx, be)
-            if c.isOpened(): cap = c; return True
+            if c.isOpened():
+                cap = c; SRC_NAME = f"index:{idx}"; return True
     return False
 
 def grab():
     if not open_capture():
         print("[ERR] No camera opened. Set CAM_DEVICE or CAM_INDEX.")
         sys.exit(1)
-    print("[INFO] Camera opened")
+    print(f"[INFO] Camera opened: {SRC_NAME}")
     while True:
         ok, f = cap.read()
         if not ok:
@@ -135,6 +148,12 @@ def calibrate(frame):
 async def serve(ws):
     global H
     print("[WS] connected")
+    # Throttle sending to a fixed interval (seconds). Default 1.0s
+    try:
+        send_interval = float(os.environ.get("SEND_INTERVAL", "1.0"))
+    except Exception:
+        send_interval = 1.0
+    last_sent = 0.0
     aruco_dict = cv2.aruco.getPredefinedDictionary(ARUCO_DICT)
     # 兼容新旧 API
     try:
@@ -146,6 +165,8 @@ async def serve(ws):
     except AttributeError:
         det = None
 
+    start_time = time.time()
+    interval = 0.02
     while True:
         f = frame_q.get()
         g = cv2.cvtColor(f, cv2.COLOR_BGR2GRAY)
@@ -169,8 +190,16 @@ async def serve(ws):
                 # 可视化调试
                 cv2.polylines(f, [pts.astype(int)], True, (0,255,0), 2)
                 cv2.putText(f, f"ID {cid}", (int(cx)+6,int(cy)-6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,255), 2)
-
-        await ws.send(json.dumps(payload))
+                
+        end_time = time.time()
+        if end_time - start_time > interval:
+            print(end_time - start_time)
+        now = time.time()
+        if now - last_sent >= send_interval:
+            await ws.send(json.dumps(payload))
+            last_sent = now
+            start_time = time.time()
+        
         info = f"H:{'Y' if H is not None else 'N'}  Markers:{len(payload['markers'])}  Map:{dst_size}"
         cv2.putText(f, info, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
         cv2.imshow("Cam", f)
